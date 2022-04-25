@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "lib"
+		},
+		{
+			"path": "test_client"
+		},
+		{
+			"path": "test_server"
+		}
+	],
+	"settings": {
+		"C_Cpp.default.includePath": [
+			"${default}",
+			"/home/ismail/Programming/projects/network/net_lib/lib/include/"
+		]
+	}
+}
