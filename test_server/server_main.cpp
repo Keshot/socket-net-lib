@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     SOCKET serverfd = INVALID_SOCKET, acceptedfd = INVALID_SOCKET;
     
     pid_t processID = getpid();
-    pid_t parentProcessID = getppid();
+    printf("Server process ID is %d", processID);
 
     i64 pagesize = sysconf(_SC_PAGE_SIZE);
 
@@ -58,42 +58,47 @@ int main(int argc, char *argv[])
             err_log("accept system call failed");
             continue;
         }
-        i32 ret = sock_ntop(ipaddrPres, IPV4P_STRLEN, ccast(const sockaddr*, &addr));
-        if(ret != 1) {
-            err_log("sock_ntop failed");
-        }
-        else {
-            printf("accepted ip: %s\tport: %u\n", ipaddrPres, sock_get_port(ccast(const sockaddr*, &addr)));
 
-            len = sizeof(sockaddr_unify);
-            if (getsockname(acceptedfd, ccast(sockaddr*, &addr), &len) < 0) {
-                err_log("getsockname failed");
+        processID = fork();
+        if (processID == 0) {
+            i32 ret = sock_ntop(ipaddrPres, IPV4P_STRLEN, ccast(const sockaddr*, &addr));
+            if(ret != 1) {
+                err_log("sock_ntop failed");
             }
             else {
-                i32 ret = sock_ntop(ipaddrPres, IPV4P_STRLEN, ccast(const sockaddr*, &addr));
-                if(ret != 1) {
-                    err_log("sock_ntop failed");
+                printf("accepted ip: %s\tport: %u\n", ipaddrPres, sock_get_port(ccast(const sockaddr*, &addr)));
+
+                len = sizeof(sockaddr_unify);
+                if (getsockname(acceptedfd, ccast(sockaddr*, &addr), &len) < 0) {
+                    err_log("getsockname failed");
                 }
                 else {
-                    printf("accepted local ip: %s\tport: %u\n", ipaddrPres, sock_get_port(ccast(const sockaddr*, &addr)));
+                    i32 ret = sock_ntop(ipaddrPres, IPV4P_STRLEN, ccast(const sockaddr*, &addr));
+                    if(ret != 1) {
+                        err_log("sock_ntop failed");
+                    }
+                    else {
+                        printf("accepted local ip: %s\tport: %u\n", ipaddrPres, sock_get_port(ccast(const sockaddr*, &addr)));
+                    }
+                }
+            }
+
+            while(true) {
+                i64 readed = readn(acceptedfd, rdBuffer, BUFFER_LENGTH);
+                
+                if(readed == 0) {
+                    break;
+                }
+
+                writen(acceptedfd, rdBuffer, readed);
+
+                if(readed < BUFFER_LENGTH) {
+                    break;
                 }
             }
         }
+        printf("");
 
-        while(true) {
-            i64 readed = readn(acceptedfd, rdBuffer, BUFFER_LENGTH);
-            
-            if(readed == 0) {
-                break;
-            }
-
-            writen(acceptedfd, rdBuffer, readed);
-
-            if(readed < BUFFER_LENGTH) {
-                break;
-            }
-        }
- 
         close(acceptedfd);
     }
 

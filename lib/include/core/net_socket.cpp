@@ -75,11 +75,11 @@ u16 sock_get_port(const sockaddr* addr)
     {
 
     case ADDR_FAMILY_IPV4: {
-        return ccast(const sockaddr_in*, &addr)->sin_port;
+        return ntohs(ccast(const sockaddr_in*, &addr)->sin_port);
     } break;
 
     case ADDR_FAMILY_IPV6: {
-        return ccast(const sockaddr_in6*, &addr)->sin6_port;
+        return ntohs(ccast(const sockaddr_in6*, &addr)->sin6_port);
     } break;
 
     default:{
