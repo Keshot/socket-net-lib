@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <bits/types.h>
+#include <signal.h>
+#include <string.h>
 
 #define ccast(type, val) reinterpret_cast<type>(val)
 
@@ -17,7 +19,10 @@ typedef __uint32_t u32;
 typedef __int64_t i64;
 typedef __uint64_t u64;
 
+typedef void sighandler_prototype(int);
 
 i32 check_byte_order();
+
+void sigchild_handler(int signum);
 
 #endif

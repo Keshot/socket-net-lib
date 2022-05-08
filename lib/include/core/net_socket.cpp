@@ -21,6 +21,7 @@ i64 readn(SOCKET sockfd, char *buffer, i64 len)
                 local_readed = 0;
             }
             else {
+                printf("error while read: %s\n", strerror(errno));
                 return -1;
             }
         }
@@ -75,7 +76,7 @@ u16 sock_get_port(const sockaddr* addr)
     {
 
     case ADDR_FAMILY_IPV4: {
-        return ntohs(ccast(const sockaddr_in*, &addr)->sin_port);
+        return ntohs(ccast(const sockaddr_in*, addr)->sin_port);
     } break;
 
     case ADDR_FAMILY_IPV6: {
@@ -212,4 +213,40 @@ i32 sock_ntop(char *dst, socklen_t len, const sockaddr *addr)
 
     }
     return -1;
+}
+
+i32 sock_pton(char *src, sockaddr *addr)
+{
+    if (!addr) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    return inet_pton(addr->sa_family, src, addr);
+}
+
+i32 sock_get_local_addr(SOCKET sockfd, char *dst, socklen_t len)
+{
+    sockaddr_unify addr;
+    socklen_t addrLen = sizeof(addr);
+    sockaddr *addrp = ccast(sockaddr*, &addr);
+
+    if (getsockname(sockfd, addrp, &addrLen) < 0) {
+        return -1;
+    }
+
+    return sock_ntop(dst, len, addrp);
+}
+
+i32 sock_get_peer_addr(SOCKET sockfd, char *dst, socklen_t len)
+{
+    sockaddr_unify addr;
+    socklen_t addrLen = sizeof(addr);
+    sockaddr *addrp = ccast(sockaddr*, &addr);
+
+    if (getpeername(sockfd, addrp, &addrLen) < 0) {
+        return -1;
+    }
+
+    return sock_ntop(dst, len, addrp);
 }

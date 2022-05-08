@@ -4,6 +4,8 @@
 #include "core.h"
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -37,6 +39,9 @@
 #define sctp_scoket(family) \
     socket(family, SOCK_SEQPACKET, SCTP_PROTO)
 
+#define MAX(x,y) \
+    (x > y ? x : y)
+
 struct sockaddr_unify {
     u8 data[sizeof(sockaddr_in6)];
 };
@@ -64,9 +69,15 @@ return:
 */
 i32 sock_bind_wild(SOCKET sockfd, i32 addrFamily);
 
+i32 sock_pton(char *dst, socklen_t len, const sockaddr *addr);
+
 i32 sock_cmp_addr(const sockaddr* frs, const sockaddr* sec);
 
 u16 sock_get_port(const sockaddr* addr);
+
+i32 sock_get_local_addr(SOCKET sockfd, char *dst, socklen_t len);
+
+i32 sock_get_peer_addr(SOCKET sockfd, char *dst, socklen_t len);
 
 i64 readn(SOCKET sockfd, char *buffer, i64 len);
 

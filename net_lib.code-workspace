@@ -13,7 +13,12 @@
 	"settings": {
 		"C_Cpp.default.includePath": [
 			"${default}",
-			"/home/ismail/Programming/projects/network/net_lib/lib/include/"
+			"/home/keshot/Programming/net_lib/lib/include/"
+		]
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-vscode.hexeditor"
 		]
 	}
 }
