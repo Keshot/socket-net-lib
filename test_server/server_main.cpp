@@ -11,15 +11,15 @@
 int main(int argc, char *argv[])
 {
     struct sigaction act;
+    int maxfd, maxi = 0;
+    int clients[FD_SETSIZE] { -1 };
+    fd_set allfds, readfds;
     char ipaddrPres[IPV4P_STRLEN];
     char *rdBuffer = new char[BUFFER_LENGTH];
-    SOCKET serverfd = INVALID_SOCKET, acceptedfd = INVALID_SOCKET;
+    SOCKET serverfd = INVALID_SOCKET;
     
     pid_t processID = getpid();
     printf("Server process ID is %d\n", processID);
-
-    int64_t max = __INT64_MAX__;
-    printf("%ld\n", max);
 
     act.sa_handler = &sigchild_handler;
     act.sa_flags = 0;
@@ -44,14 +44,7 @@ int main(int argc, char *argv[])
     sa.sin_addr.s_addr = htonl(INADDR_ANY);
     sa.sin_port = htons(5643);
 
-    union ttttuuu
-    {
-        int a;
-        char b[sizeof(int)];
-    };
-    
-    ttttuuu oi;
-    oi.a = -22;
+    FD_ZERO(&allfds);
 
     if( (serverfd = socket(PROTO_FAMILY_IPV4, SOCK_STREAM, TCP_PROTO)) <= INVALID_SOCKET) {
         err_crit("socket system call failed");
@@ -65,6 +58,8 @@ int main(int argc, char *argv[])
         err_crit("listen system call failed");
     }
 
+    maxfd = serverfd;
+
     if (sock_get_local_addr(serverfd, ipaddrPres, IPV4P_STRLEN) != 1) {
         err_log("sock_get_local_addr failed");
     }
@@ -73,19 +68,26 @@ int main(int argc, char *argv[])
     }
 
     while(true) {
-        sockaddr_unify addr;
-        socklen_t len = sizeof(sockaddr_unify);
-        acceptedfd = accept(serverfd, ccast(sockaddr*, &addr), &len);
-        if (acceptedfd < 0) {
-            if(errno == EINTR || errno == ECONNABORTED) {
-                continue;
-            }
-            err_crit("accept system call failed");
-        }
+        readfds = allfds;
+        int readyfd = select(maxfd + 1, &readfds, NULL, NULL, NULL);
 
-        processID = fork();
-        if (processID == 0) {
-            printf("Process start by child process with ID %d\n", getpid());
+        if (FD_ISSET(serverfd, &readfds)) {
+            sockaddr_unify addr;
+            socklen_t len = sizeof(sockaddr_unify);
+            SOCKET acceptedfd;
+
+            while (true) {
+                len = sizeof(sockaddr_unify);
+                acceptedfd = accept(serverfd, ccast(sockaddr*, &addr), &len);
+                if (acceptedfd < 0) {
+                    if(errno == EINTR || errno == ECONNABORTED || errno == EPROTO) {
+                        continue;
+                    }
+                    err_crit("accept system call failed");
+                }
+                break;
+            }
+
             if(sock_ntop(ipaddrPres, IPV4P_STRLEN, ccast(const sockaddr*, &addr)) != 1) {
                 err_log("sock_ntop failed");
             }
@@ -102,21 +104,69 @@ int main(int argc, char *argv[])
                 }
             }
 
-            while(true) {
-                i64 readed = readn(acceptedfd, rdBuffer, BUFFER_LENGTH);
-                printf("From client readed %ld bytes\n", readed);        
-                if(readed == 0) {
-                    break;
+            int i = 0;
+            for (; i < FD_SETSIZE; ++i) {
+                if (clients[i] < 0) {
+                    clients[i] = acceptedfd;
                 }
-
-                writen(acceptedfd, rdBuffer, readed);
             }
 
-            printf("Child process complete processing exit\n");
-            exit(0);
+            if (i == FD_SETSIZE) {
+                printf("Too many connection accpeted disconnect new client\n");
+                close(acceptedfd); // dangerous
+            }
+            else {
+                FD_SET(acceptedfd, &allfds);
+                if (acceptedfd > maxfd) {
+                    maxfd = acceptedfd;
+                }
+
+                if (i > maxi) {
+                    maxi = i;
+                }
+            }
+
+            if (--readyfd <= 0) {
+                continue;
+            }
         }
-        printf("Start processing clinet in process with ID %d\n", processID);
-        close(acceptedfd);
+
+        for (int i = 0; i <= maxi; ++i) {
+            SOCKET sock = clients[i];
+            if (sock < 0) {
+                continue;
+            }
+            if (FD_ISSET(sock, &readfds)) {
+                i64 readed = readn(sock, rdBuffer, BUFFER_LENGTH);
+                printf("From client readed %ld bytes\n", readed);
+                if(readed == 0) {
+                    clients[i] = -1;
+                    FD_CLR(sock, &allfds);
+                    close(sock);
+
+                    if (i == maxi) {
+                        int j = i;
+                        for (; j >= 0; --j) {
+                            if(clients[j] >= 0) {
+                                maxi = j;
+                            }
+                        }
+
+                        if (j == 0) {
+                            maxi = 0;
+                        }
+                    }
+                }
+                else {
+                    readed = writen(sock, rdBuffer, readed);
+                    printf("Writed %d to client\n", readed);
+                }
+
+                if (--readyfd <= 0) {
+                    continue;
+                }
+            }
+        }
     }
 
     return 0;
