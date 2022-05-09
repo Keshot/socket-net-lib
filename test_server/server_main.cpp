@@ -11,7 +11,7 @@
 int main(int argc, char *argv[])
 {
     struct sigaction act;
-    int maxfd, maxi = 0;
+    int maxfd, maxi = -1;
     int clients[FD_SETSIZE] { -1 };
     fd_set allfds, readfds;
     char ipaddrPres[IPV4P_STRLEN];
@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
     }
 
     maxfd = serverfd;
+    FD_SET(serverfd, &allfds);
 
     if (sock_get_local_addr(serverfd, ipaddrPres, IPV4P_STRLEN) != 1) {
         err_log("sock_get_local_addr failed");
@@ -67,6 +68,7 @@ int main(int argc, char *argv[])
         printf("server local ip: %s\tport: %hu\n", ipaddrPres, sock_get_port(ccast(const sockaddr*, &sa)));
     }
 
+    printf("Start maxfd %d\n", maxfd);
     while(true) {
         readfds = allfds;
         int readyfd = select(maxfd + 1, &readfds, NULL, NULL, NULL);
@@ -108,6 +110,7 @@ int main(int argc, char *argv[])
             for (; i < FD_SETSIZE; ++i) {
                 if (clients[i] < 0) {
                     clients[i] = acceptedfd;
+                    break;
                 }
             }
 
@@ -116,17 +119,21 @@ int main(int argc, char *argv[])
                 close(acceptedfd); // dangerous
             }
             else {
+                printf("New client id %d\n", i);
                 FD_SET(acceptedfd, &allfds);
                 if (acceptedfd > maxfd) {
                     maxfd = acceptedfd;
+                    printf("New max fd set %d\n", maxfd);
                 }
 
                 if (i > maxi) {
                     maxi = i;
+                    printf("New max client ID set %d\n", maxi);
                 }
             }
 
             if (--readyfd <= 0) {
+                printf("All ready fd processed continue select\n");
                 continue;
             }
         }
@@ -138,28 +145,44 @@ int main(int argc, char *argv[])
             }
             if (FD_ISSET(sock, &readfds)) {
                 i64 readed = readn(sock, rdBuffer, BUFFER_LENGTH);
-                printf("From client readed %ld bytes\n", readed);
+                printf("From client ID %d readed %ld bytes\n", sock, readed);
                 if(readed == 0) {
                     clients[i] = -1;
                     FD_CLR(sock, &allfds);
-                    close(sock);
 
                     if (i == maxi) {
                         int j = i;
                         for (; j >= 0; --j) {
                             if(clients[j] >= 0) {
                                 maxi = j;
+                                break;
                             }
                         }
 
-                        if (j == 0) {
-                            maxi = 0;
+                        if (j < 0) {
+                            maxi = -1;
                         }
+
+                        printf("New maxi %d\n", maxi);
                     }
+
+                    if (sock == maxfd) {
+                        maxfd = serverfd;
+                        for (int k = 0; k < maxi; ++k) {
+                            SOCKET sck = clients[k];
+                            if (sck > maxfd) {
+                                maxfd = sck;
+                            }
+                        }
+
+                        printf("New maxfd %d\n", maxfd);
+                    }
+
+                    close(sock);
                 }
                 else {
                     readed = writen(sock, rdBuffer, readed);
-                    printf("Writed %d to client\n", readed);
+                    printf("Writed %ld to client\n", readed);
                 }
 
                 if (--readyfd <= 0) {
